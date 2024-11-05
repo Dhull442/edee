@@ -1,10 +1,7 @@
 use crossterm::event::{read, Event, Event::Key, KeyCode::Char, KeyEvent, KeyModifiers};
-use crossterm::style::Print;
-use std::io::stdout;
-use std::io::Write;
+use std::io::Error;
 mod terminal;
-use terminal::Terminal;
-use terminal::Vector;
+use terminal::{Terminal, Vector};
 
 pub struct Editor {
     content: String,
@@ -28,7 +25,7 @@ impl Editor {
         result.unwrap();
     }
 
-    fn repl(&mut self) -> Result<(), std::io::Error> {
+    fn repl(&mut self) -> Result<(), Error> {
         loop {
             self.refresh_screen()?;
             if self.quit {
@@ -53,7 +50,6 @@ impl Editor {
                             'q' => self.quit = true,
                             _ => (),
                         }
-                        self.quit = true;
                     } else {
                         self.content.push(*c);
                         self.nlines = 1;
@@ -70,30 +66,33 @@ impl Editor {
         }
     }
 
-    fn refresh_screen(&mut self) -> Result<(), std::io::Error> {
+    fn refresh_screen(&mut self) -> Result<(), Error> {
         Terminal::hide_cursor()?;
-        Terminal::clear_screen()?;
-        Terminal::move_to(Vector::new((0, 0)));
-        // Print("{}\r",self.content);
-        // stdout.flush();
-        Self::draw_rows()?;
         if self.quit {
-            Print("Exiting!\r\n");
-            stdout().flush();
+            Terminal::clear_screen()?;
+            Terminal::print("Exiting!\r\n")?;
+        } else {
+            Self::draw_rows()?;
+            if self.content.len() < 1 {
+                Terminal::print_welcome_message()?;
+            }
+            Terminal::move_cursor_to(Vector { x: 0, y: 0 })?;
         }
         Terminal::show_cursor()?;
+        Terminal::execute()?;
         Ok(())
     }
 
-    fn draw_rows() -> Result<(), std::io::Error> {
-        let v: Vector = Terminal::size()?;
-        for i in 1..v.height {
-            Print("~");
-            if i < v.height - 1 {
-                Print("\r\n");
-            }
+    fn draw_rows() -> Result<(), Error> {
+        let Vector { y, .. } = Terminal::size()?;
+        for current_row in 0..y {
+            Terminal::move_cursor_to(Vector {
+                x: 0,
+                y: current_row,
+            })?;
+            Terminal::clear_line()?;
+            Terminal::print("~")?;
         }
-        stdout().flush();
         Ok(())
     }
 }
