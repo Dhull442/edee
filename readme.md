@@ -4,4 +4,4 @@ Building a terminal text editor in rust for fun and enhancement of technical ski
 
 
 
-![Guide Link](https://flenker.blog/hecto/)
+[Guide Link](https://flenker.blog/hecto/)
