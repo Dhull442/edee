@@ -1,63 +1,25 @@
 use crossterm::cursor::{Hide, MoveTo, Show};
-use crossterm::event::{read, Event, Event::Key, KeyCode::Char, KeyEvent, KeyModifiers};
 use crossterm::style::Print;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size, Clear, ClearType};
-use crossterm::{execute, queue, Command};
-use std::cmp::min;
+use crossterm::{queue, Command};
 use std::io::{stdout, Error, Write};
 
-const NAME: &str = env!("CARGO_PKG_NAME");
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 #[derive(Copy, Clone, Default)]
-pub struct Vector {
-    pub x: u16,
-    pub y: u16,
+pub struct Position {
+    pub x: usize,
+    pub y: usize,
 }
-
 pub struct Terminal;
 impl Terminal {
     pub fn initialize() -> Result<(), Error> {
         enable_raw_mode()?;
         Self::clear_screen()?;
-        Self::move_caret_to(Vector { x: 0, y: 0 })?;
+        Self::move_caret_to(Position::default())?;
         Self::execute()?;
         Ok(())
     }
 
-    pub fn print_welcome_message() -> Result<(), Error> {
-        let size = Self::size()?;
-        let mut line = format!("{NAME}: a friendly text-editor in Rust\r");
-        let mut width = min(line.len() as u16, size.x);
-        Self::print_at_position(
-            Vector {
-                x: (size.x - width) / 2,
-                y: size.y / 3 - 1,
-            },
-            &line,
-        )?;
-        line = format!("v{VERSION}\r");
-        width = min(line.len() as u16, size.x);
-        Self::print_at_position(
-            Vector {
-                x: (size.x - width) / 2,
-                y: size.y / 3,
-            },
-            &line,
-        )?;
-        line = format!("by Saksham Dhull\r");
-        width = min(line.len() as u16, size.x);
-        Self::print_at_position(
-            Vector {
-                x: (size.x - width) / 2,
-                y: size.y / 3 + 1,
-            },
-            &line,
-        )?;
-        Ok(())
-    }
-
-    pub fn print_at_position(position: Vector, string: &str) -> Result<(), Error> {
+    pub fn print_at_position(position: Position, string: &str) -> Result<(), Error> {
         Self::move_caret_to(position)?;
         Self::print(string)?;
         Ok(())
@@ -84,16 +46,16 @@ impl Terminal {
         Ok(())
     }
 
-    pub fn move_caret_to(position: Vector) -> Result<(), Error> {
-        Self::queue_command(MoveTo(position.x, position.y))?;
+    pub fn move_caret_to(position: Position) -> Result<(), Error> {
+        Self::queue_command(MoveTo(position.x as u16, position.y as u16))?;
         Ok(())
     }
 
-    pub fn size() -> Result<Vector, Error> {
+    pub fn size() -> Result<Position, Error> {
         let (width, height) = size()?;
-        Ok(Vector {
-            x: width,
-            y: height,
+        Ok(Position {
+            x: width as usize,
+            y: height as usize,
         })
     }
 

@@ -1,31 +1,35 @@
-use crossterm::event::{read, Event::{self,Key}, KeyCode, KeyEvent, KeyModifiers};
-use std::io::Error;
+use crossterm::event::{
+    read,
+    Event::{self, Key},
+    KeyCode, KeyEvent, KeyModifiers,
+};
 use std::cmp::min;
+use std::{env, io::Error};
 mod terminal;
-use terminal::{Terminal, Vector};
-
+use terminal::{Position, Terminal};
+mod view;
+use view::View;
 
 #[derive(Default)]
 pub struct Editor {
-    content: String,
+    view: View,
     quit: bool,
-    caret_location: Vector,
+    caret_location: Position,
 }
-
 impl Editor {
-    pub const fn default() -> Self {
-        Self {
-            content: String::new(),
-            caret_location: Vector{ x:0,y:0 },
-            quit: false,
-        }
-    }
-
     pub fn run(&mut self) {
         Terminal::initialize().unwrap();
+        self.handle_args();
         let result = self.repl();
         Terminal::terminate().unwrap();
         result.unwrap();
+    }
+
+    fn handle_args(&mut self) {
+        let args: Vec<String> = env::args().collect();
+        if let Some(filename) = args.get(1) {
+            self.view.load(String::from(filename)).unwrap();
+        }
     }
 
     fn repl(&mut self) -> Result<(), Error> {
@@ -41,16 +45,25 @@ impl Editor {
         Ok(())
     }
 
-    fn evaluate_event(&mut self, event: &Event) -> Result<(),Error> {
+    fn evaluate_event(&mut self, event: &Event) -> Result<(), Error> {
         if let Key(KeyEvent {
             code, modifiers, ..
         }) = event
         {
             match code {
-                KeyCode::Char('q') if *modifiers == KeyModifiers::CONTROL => {
-                    self.quit = true
+                KeyCode::Char('q') if *modifiers == KeyModifiers::CONTROL => self.quit = true,
+                KeyCode::Char(c) => {
+                    self.caret_location = self.view.write(c, self.caret_location.y)?;
+                    Terminal::move_caret_to(self.caret_location)?;
                 }
-                KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right | KeyCode::PageUp | KeyCode::PageDown | KeyCode::Home | KeyCode::End => {
+                KeyCode::Up
+                | KeyCode::Down
+                | KeyCode::Left
+                | KeyCode::Right
+                | KeyCode::PageUp
+                | KeyCode::PageDown
+                | KeyCode::Home
+                | KeyCode::End => {
                     self.move_point(*code)?;
                 }
                 _ => (),
@@ -59,8 +72,8 @@ impl Editor {
         Ok(())
     }
 
-    fn move_point(&mut self, key_code: KeyCode) -> Result<(),Error> {
-        let Vector{mut x, mut y} = self.caret_location;
+    fn move_point(&mut self, key_code: KeyCode) -> Result<(), Error> {
+        let Position { mut x, mut y } = self.caret_location;
         let size = Terminal::size()?;
         let h = size.x;
         let w = size.y;
@@ -91,7 +104,7 @@ impl Editor {
             }
             _ => (),
         }
-        self.caret_location = Vector{x,y};
+        self.caret_location = Position { x, y };
         Ok(())
     }
 
@@ -99,30 +112,13 @@ impl Editor {
         Terminal::hide_caret()?;
         if self.quit {
             Terminal::clear_screen()?;
-            Terminal::move_caret_to(Vector{x:0,y:0})?;
-            Terminal::print("Exiting!\r\n")?;
+            Terminal::print_at_position(Position::default(), "Exiting!\r\n")?;
         } else {
-            Self::draw_rows()?;
-            if self.content.len() < 1 {
-                Terminal::print_welcome_message()?;
-            }
+            self.view.render()?;
             Terminal::move_caret_to(self.caret_location)?;
         }
         Terminal::show_caret()?;
         Terminal::execute()?;
-        Ok(())
-    }
-
-    fn draw_rows() -> Result<(), Error> {
-        let Vector { y, .. } = Terminal::size()?;
-        for current_row in 0..y {
-            Terminal::move_caret_to(Vector {
-                x: 0,
-                y: current_row,
-            })?;
-            Terminal::clear_line()?;
-            Terminal::print("~")?;
-        }
         Ok(())
     }
 }
